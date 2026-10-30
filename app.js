@@ -113,29 +113,29 @@ function printNameLines(name,limit=14){
   }
   if(line)lines.push(line);return lines.length?lines:[''];
 }
+function posterLeaves(){
+  const leaves=Array.from({length:9},(_,i)=>{const x=12+i*20,y=142-i*14,angle=-48+i*4;return `<ellipse cx="${x}" cy="${y}" rx="12" ry="23" transform="rotate(${angle} ${x} ${y})" fill="url(#leafWash)" opacity="${.36+(i%3)*.12}"/><ellipse cx="${x+13}" cy="${y+18}" rx="10" ry="20" transform="rotate(${angle+90} ${x+13} ${y+18})" fill="url(#leafWash)" opacity=".38"/>`}).join('');
+  return `<g><path d="M 2 178 Q 64 93 190 25" fill="none" stroke="#8e9b7d" stroke-width="1.5" opacity=".65"/>${leaves}</g>`;
+}
 function printableChart(){
-  const minX=Math.min(0,...state.tables.map(t=>t.x-80)),minY=Math.min(0,...state.tables.map(t=>t.y-80));
-  const maxX=Math.max(400,...state.tables.map(t=>t.x+(t.type==='head'?440:320))),maxY=Math.max(300,...state.tables.map(t=>t.y+320));
-  
-  const tables=state.tables.map(t=>{
-    const head=t.type==='head',cx=head?210:120,cy=head?118:120;
-    let drawing=head?'<rect x="0" y="85" width="420" height="66" rx="14" fill="#e8eddf" stroke="#869674"/>':'<circle cx="120" cy="120" r="63" fill="#f5f7ee" stroke="#869674"/>';
-    drawing+=`<text x="${cx}" y="${cy-3}" text-anchor="middle" font-size="16" fill="#344c32">${esc(t.name)}</text><text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="10" fill="#65755b">${head?'Նորապսակների սեղան':'Սիրով սպասում ենք ձեզ'}</text>`;
-    for(let i=0;i<(head?6:12);i++){
-      const g=state.guests.find(g=>g.table===t.id&&g.seat===i),a=i/12*Math.PI*2-Math.PI/2;
-      const x=head?i*70-8:120+125*Math.cos(a)-42,y=head?30:i===0?-42:i===6?244:120+125*Math.sin(a)-20;
-      if(!g)continue;
-      const width=head?66:84,lines=g?printNameLines(g.name,head?11:14):[String(i+1)],height=Math.max(40,lines.length*11+10);
-      const fill='#ffffff';
-
-      drawing+=`<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="8" fill="${esc(fill)}" stroke="#a4ad99"/><text text-anchor="middle" font-size="9" fill="#263526">${lines.map((line,j)=>`<tspan x="${x+width/2}" y="${y+(height-lines.length*11)/2+9+j*11}">${esc(line)}</tspan>`).join('')}</text>`;
-    }
-    return `<g transform="translate(${t.x} ${t.y})">${drawing}</g>`;
+  const occupied=state.tables.map(t=>({name:t.name,guests:guestsAt(t).slice().sort((a,b)=>a.name.localeCompare(b.name,'hy'))})).filter(t=>t.guests.length);
+  const pages=[];for(let i=0;i<occupied.length;i+=12)pages.push(occupied.slice(i,i+12));if(!pages.length)pages.push([]);
+  const sheets=pages.map(tables=>{
+    const columns=tables.length>9?4:tables.length>4?3:2,rows=Math.max(2,Math.ceil(tables.length/columns));
+    const cellWidth=704/columns,cellHeight=988/rows,fontSize=columns===4?14:16;
+    const cards=tables.map((t,i)=>{
+      const center=68+(i%columns+.5)*cellWidth,top=94+Math.floor(i/columns)*cellHeight;
+      const maxChars=columns===4?20:columns===3?25:34;
+      const names=t.guests.map(g=>printNameLines(g.name,maxChars));
+      const totalLines=names.reduce((sum,lines)=>sum+lines.length,0),gap=Math.min(9,Math.max(3,(cellHeight-86-totalLines*(fontSize+4))/Math.max(1,names.length)));
+      const lineHeight=Math.min(fontSize+4,(cellHeight-75-names.length*gap)/Math.max(1,totalLines));
+      let y=top+58;
+      const text=names.map(lines=>{const name=`<text x="${center}" y="${y}" text-anchor="middle" font-size="${fontSize}" fill="#353b33">${lines.map((line,j)=>`<tspan x="${center}" dy="${j?lineHeight:0}">${esc(line)}</tspan>`).join('')}</text>`;y+=lines.length*lineHeight+gap;return name}).join('');
+      return `<g><text x="${center}" y="${top}" text-anchor="middle" font-family="Georgia, 'Noto Serif Armenian', serif" font-size="${columns===4?20:23}" fill="#414c39">${esc(t.name)}</text><path d="M ${center-24} ${top+18} H ${center+24}" stroke="#a4ad90" stroke-width=".8"/>${text}</g>`;
+    }).join('');
+    return `<section class="poster"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 1188" role="img" aria-label="Հարսանեկան սեղանների հյուրերի ցանկ"><defs><linearGradient id="leafWash" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b6c5b4"/><stop offset=".55" stop-color="#829b88"/><stop offset="1" stop-color="#d3d9c8"/></linearGradient></defs><rect width="840" height="1188" fill="#fffef9"/><rect x="22" y="22" width="796" height="1144" fill="none" stroke="#a4ad8b" stroke-width="2"/><rect x="29" y="29" width="782" height="1130" fill="none" stroke="#d8ddca" stroke-width=".7"/><g transform="translate(24 15) scale(.8)">${posterLeaves()}</g><g transform="translate(816 1173) rotate(180) scale(.8)">${posterLeaves()}</g><g font-family="Arial, 'Noto Sans Armenian', sans-serif">${cards||'<text x="420" y="594" text-anchor="middle" font-size="20" fill="#69765b">Նախ տեղավորեք հյուրերին սեղանների շուրջ։</text>'}</g><path d="M 361 1135 H 410 M 430 1135 H 479" stroke="#a4ad8b" stroke-width=".8"/><path d="M 420 1129 L 422 1133 L 426 1135 L 422 1137 L 420 1141 L 418 1137 L 414 1135 L 418 1133 Z" fill="#8e9b7d"/></svg></section>`;
   }).join('');
-  const seated=state.guests.filter(g=>g.table).length;
-  const rosters=[...state.tables.map(t=>({name:t.name,guests:guestsAt(t).sort((a,b)=>a.name.localeCompare(b.name,'hy')),head:t.type==='head'})),{name:'Առանց տեղի',guests:[],head:false}].filter(t=>t.guests.length);
-  return `<!doctype html><html lang="hy"><head><meta charset="utf-8"><title>${esc(state.couple)} — Հյուրերի տեղավորում</title><style>
-  @page{size:A3 landscape;margin:12mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#293b2c;-webkit-print-color-adjust:exact;print-color-adjust:exact}.print-actions{padding:14px;background:#edf2e7;font-size:13px;display:flex;align-items:center;gap:15px}.print-actions button{padding:9px 16px;background:#49634b;color:white;border:0;border-radius:5px;cursor:pointer}.sheet{padding:12px}h1{font-size:24px;margin:0 0 6px}.summary{font-size:12px;color:#67775d;margin-bottom:10px}.chart{width:100%;height:218mm;display:block}.legend{display:flex;flex-wrap:wrap;gap:7px 16px;font-size:10px;padding-top:8px}.legend span{display:inline-flex;align-items:center;gap:5px}.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}.rosters{break-before:page;padding:12px}.roster{break-inside:avoid;margin:15px 0;border:1px solid #d8dfd1;border-radius:5px;padding:12px}.roster h2{font-size:16px;margin:0 0 10px}.guest-row{display:flex;gap:12px;font-size:14px;border-top:1px solid #e7ecdf;padding:9px 0}.guest-number{display:none}.rosters{columns:3;column-gap:22px}.rosters>h1{column-span:all;font-family:Georgia,serif;font-size:28px;text-align:center;margin:0 0 24px}.roster{background:#fff;border:1px solid #d9ddcf;padding:20px;margin:0 0 20px}.roster h2{text-align:center;font-family:Georgia,serif;font-size:22px;font-weight:400;padding-bottom:12px}.sheet>h1{text-align:center;font-family:Georgia,serif;font-size:30px;font-weight:400}.summary{text-align:center;letter-spacing:1px}.guest-row span{width:100%;text-align:center}.guest-row small{font-size:10px;color:#69785e}@media print{.print-actions{display:none}.sheet{padding:0;break-after:page}.rosters{padding:0}h1{font-size:20px}}</style></head><body><div class="print-actions"><button onclick="window.print()">Տպել / Պահպանել որպես PDF</button><span>Ընտրեք «Save as PDF»՝ PDF ներբեռնելու համար։ Հատակագիծը վեկտորային է՝ ցանկացած խոշորացմամբ հստակ։</span></div><section class="sheet"><h1>${esc(state.couple)}</h1><div class="summary">Գտեք ձեր սեղանը և վայելեք երեկոն</div><svg class="chart" xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${maxX-minX} ${maxY-minY}" role="img" aria-label="Հյուրերի տեղավորման հատակագիծ">${tables}</svg></section><section class="rosters"><h1>Ձեր տեղը մեր տոնին</h1>${rosters.map(t=>`<div class="roster"><h2>${esc(t.name)}</h2>${t.guests.map(g=>`<div class="guest-row"><span class="guest-number">${g.seat+1}</span><span>${esc(g.name)}</span></div>`).join('')}</div>`).join('')}</section></body></html>`;
+  return `<!doctype html><html lang="hy"><head><meta charset="utf-8"><title>Հարսանեկան սեղանների ցանկ</title><style>@page{size:A2 portrait;margin:0}*{box-sizing:border-box}body{margin:0;background:#e9ebe3;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}.print-actions{padding:14px 20px;display:flex;gap:16px;align-items:center;justify-content:center;background:#f9faf5;font-size:12px;color:#68745e;position:sticky;top:0;z-index:1}.print-actions button{background:#49634b;color:#fff;padding:11px 18px;border:0;border-radius:5px;cursor:pointer}.poster{width:min(840px,calc(100% - 32px));margin:24px auto;box-shadow:0 12px 45px #26321c20}.poster svg{display:block;width:100%;height:auto}@media print{body{background:white}.print-actions{display:none}.poster{width:420mm;height:594mm;margin:0;box-shadow:none;break-after:page;page-break-after:always}.poster:last-child{break-after:auto;page-break-after:auto}.poster svg{width:100%;height:100%}}</style></head><body><div class="print-actions"><button onclick="window.print()">Տպել / Պահպանել որպես PDF</button><span>A2 · Ուղղանկյուն · Կարող եք տպել նաև A3 կամ A4՝ ընտրելով «Fit to page»։</span></div>${sheets}</body></html>`;
 }
 $('#exportPdf').onclick=()=>{
   const preview=window.open('','_blank');
