@@ -101,3 +101,45 @@ $('#applySuggestion').onclick=()=>{
   pendingSuggestion.assignments.forEach(a=>Object.assign(state.guests.find(g=>g.id===a.guestId),{table:a.table,seat:a.seat}));
   const count=pendingSuggestion.assignments.length;pendingSuggestion=null;save();render();$('#suggestDialog').close();toast(`Տեղավորվել է ${count} հյուր։`);
 };
+
+// SVG stays vector-sharp when the browser prints it to PDF.
+function printNameLines(name,limit=14){
+  const lines=[];let line='';
+  for(const word of name.split(/\s+/)){
+    if(line&&(line+' '+word).length>limit){lines.push(line);line=''}
+    const chars=Array.from(word);
+    while(chars.length>limit){if(line){lines.push(line);line=''}lines.push(chars.splice(0,limit).join(''))}
+    line+=(line?' ':'')+chars.join('');
+  }
+  if(line)lines.push(line);return lines.length?lines:[''];
+}
+function printableChart(){
+  const minX=Math.min(0,...state.tables.map(t=>t.x-80)),minY=Math.min(0,...state.tables.map(t=>t.y-80));
+  const maxX=Math.max(400,...state.tables.map(t=>t.x+(t.type==='head'?440:320))),maxY=Math.max(300,...state.tables.map(t=>t.y+320));
+  
+  const tables=state.tables.map(t=>{
+    const head=t.type==='head',cx=head?210:120,cy=head?118:120;
+    let drawing=head?'<rect x="0" y="85" width="420" height="66" rx="14" fill="#e8eddf" stroke="#869674"/>':'<circle cx="120" cy="120" r="63" fill="#f5f7ee" stroke="#869674"/>';
+    drawing+=`<text x="${cx}" y="${cy-3}" text-anchor="middle" font-size="16" fill="#344c32">${esc(t.name)}</text><text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="10" fill="#65755b">${head?'Նորապսակների սեղան':'Սիրով սպասում ենք ձեզ'}</text>`;
+    for(let i=0;i<(head?6:12);i++){
+      const g=state.guests.find(g=>g.table===t.id&&g.seat===i),a=i/12*Math.PI*2-Math.PI/2;
+      const x=head?i*70-8:120+125*Math.cos(a)-42,y=head?30:i===0?-42:i===6?244:120+125*Math.sin(a)-20;
+      if(!g)continue;
+      const width=head?66:84,lines=g?printNameLines(g.name,head?11:14):[String(i+1)],height=Math.max(40,lines.length*11+10);
+      const fill='#ffffff';
+
+      drawing+=`<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="8" fill="${esc(fill)}" stroke="#a4ad99"/><text text-anchor="middle" font-size="9" fill="#263526">${lines.map((line,j)=>`<tspan x="${x+width/2}" y="${y+(height-lines.length*11)/2+9+j*11}">${esc(line)}</tspan>`).join('')}</text>`;
+    }
+    return `<g transform="translate(${t.x} ${t.y})">${drawing}</g>`;
+  }).join('');
+  const seated=state.guests.filter(g=>g.table).length;
+  const rosters=[...state.tables.map(t=>({name:t.name,guests:guestsAt(t).sort((a,b)=>a.name.localeCompare(b.name,'hy')),head:t.type==='head'})),{name:'Առանց տեղի',guests:[],head:false}].filter(t=>t.guests.length);
+  return `<!doctype html><html lang="hy"><head><meta charset="utf-8"><title>${esc(state.couple)} — Հյուրերի տեղավորում</title><style>
+  @page{size:A3 landscape;margin:12mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#293b2c;-webkit-print-color-adjust:exact;print-color-adjust:exact}.print-actions{padding:14px;background:#edf2e7;font-size:13px;display:flex;align-items:center;gap:15px}.print-actions button{padding:9px 16px;background:#49634b;color:white;border:0;border-radius:5px;cursor:pointer}.sheet{padding:12px}h1{font-size:24px;margin:0 0 6px}.summary{font-size:12px;color:#67775d;margin-bottom:10px}.chart{width:100%;height:218mm;display:block}.legend{display:flex;flex-wrap:wrap;gap:7px 16px;font-size:10px;padding-top:8px}.legend span{display:inline-flex;align-items:center;gap:5px}.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}.rosters{break-before:page;padding:12px}.roster{break-inside:avoid;margin:15px 0;border:1px solid #d8dfd1;border-radius:5px;padding:12px}.roster h2{font-size:16px;margin:0 0 10px}.guest-row{display:flex;gap:12px;font-size:14px;border-top:1px solid #e7ecdf;padding:9px 0}.guest-number{display:none}.rosters{columns:3;column-gap:22px}.rosters>h1{column-span:all;font-family:Georgia,serif;font-size:28px;text-align:center;margin:0 0 24px}.roster{background:#fff;border:1px solid #d9ddcf;padding:20px;margin:0 0 20px}.roster h2{text-align:center;font-family:Georgia,serif;font-size:22px;font-weight:400;padding-bottom:12px}.sheet>h1{text-align:center;font-family:Georgia,serif;font-size:30px;font-weight:400}.summary{text-align:center;letter-spacing:1px}.guest-row span{width:100%;text-align:center}.guest-row small{font-size:10px;color:#69785e}@media print{.print-actions{display:none}.sheet{padding:0;break-after:page}.rosters{padding:0}h1{font-size:20px}}</style></head><body><div class="print-actions"><button onclick="window.print()">Տպել / Պահպանել որպես PDF</button><span>Ընտրեք «Save as PDF»՝ PDF ներբեռնելու համար։ Հատակագիծը վեկտորային է՝ ցանկացած խոշորացմամբ հստակ։</span></div><section class="sheet"><h1>${esc(state.couple)}</h1><div class="summary">Գտեք ձեր սեղանը և վայելեք երեկոն</div><svg class="chart" xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${maxX-minX} ${maxY-minY}" role="img" aria-label="Հյուրերի տեղավորման հատակագիծ">${tables}</svg></section><section class="rosters"><h1>Ձեր տեղը մեր տոնին</h1>${rosters.map(t=>`<div class="roster"><h2>${esc(t.name)}</h2>${t.guests.map(g=>`<div class="guest-row"><span class="guest-number">${g.seat+1}</span><span>${esc(g.name)}</span></div>`).join('')}</div>`).join('')}</section></body></html>`;
+}
+$('#exportPdf').onclick=()=>{
+  const preview=window.open('','_blank');
+  if(!preview){toast('Թույլատրեք նոր պատուհանները՝ PDF-ը բացելու համար։');return}
+  preview.document.open();preview.document.write(printableChart());preview.document.close();
+  preview.onload=()=>{preview.focus();preview.print()};
+};
